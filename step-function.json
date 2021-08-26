@@ -1,0 +1,134 @@
+{
+  "StartAt": "Start - Notify Slack",
+  "States": {
+    "Start - Notify Slack": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-slack-lambda-arn}",
+      "InputPath": "$.inputs.slack_message_start_training",
+      "ResultPath": "$.results.slack_message_start_training",
+      "Next": "Create Sagemaker Model"
+    },
+    "Create Sagemaker Model": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-create-model-lambda-arn}",
+      "InputPath": "$",
+      "ResultPath": "$.results.created_model",
+      "Next": "Create Sagemaker Endpoint Configuration"
+    },
+    "Create Sagemaker Endpoint Configuration": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-create-endpoint-config-lambda-arn}",
+      "InputPath": "$",
+      "ResultPath": "$.results.endpoint_config",
+      "Next": "Update Sagemaker Endpoint"
+    },
+    "Update Sagemaker Endpoint": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-update-endpoint-lambda-arn}",
+      "InputPath": "$",
+      "ResultPath": "$.results.updated_endpoint",
+      "Next": "Wait for Endpoint to be created/updated"
+    },
+    "Wait for Endpoint to be created/updated": {
+      "Type": "Wait",
+      "Seconds": 60,
+      "Next": "Check Endpoint Status"
+    },
+    "Check Endpoint Status": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-get-endpoint-status-lambda-arn}",
+      "InputPath": "$.results.updated_endpoint",
+      "ResultPath": "$.results.endpoint_status",
+      "Next": "Is Endpoint In Service?"
+    },
+    "Is Endpoint In Service?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.results.endpoint_status.status",
+          "StringEquals": "InService",
+          "Next": "Test Sagemaker Endpoint"
+        },
+        {
+          "Variable": "$.results.endpoint_status.status",
+          "StringEquals": "Failed",
+          "Next": "Fail - Notify Slack"
+        }
+      ],
+      "Default": "Wait for Endpoint to be created/updated"
+    },
+    "Test Sagemaker Endpoint": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-invoke-endpoint-lambda-arn}",
+      "InputPath": "$.inputs.invoke_endpoint",
+      "ResultPath": "$.results.invoke_endpoint_status",
+      "Next": "Is Endpoint available?"
+    },
+    "Is Endpoint available?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.results.invoke_endpoint_status.success",
+          "BooleanEquals": true,
+          "Next": "Bookmark Endpoint Configuration"
+        },
+        {
+          "Variable": "$.results.invoke_endpoint_status.success",
+          "BooleanEquals": false,
+          "Next": "Slack- Rollback Notification"
+        }
+      ],
+      "Default": "Wait for Endpoint to be created/updated"
+    },
+    "Bookmark Endpoint Configuration": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-bookmark-endpoint-config-arn}",
+      "InputPath": "$.inputs.endpoint",
+      "ResultPath": "$.results.bookmark_endpoint_status",
+      "Next": "Create Cloudwatch Monitoring"
+    },
+    "Create Cloudwatch Monitoring": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-create-cloudwatch-alarms-lambda-arn}",
+      "InputPath": "$.results.endpoint_status",
+      "ResultPath": "$.results.monitoring_status",
+      "Next": "Auto Scale Sagemaker Endpoint"
+    },
+    "Auto Scale Sagemaker Endpoint": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-apply-auto-scaling-arn}",
+      "InputPath": "$.inputs.endpoint_auto_scaling",
+      "ResultPath": "$.results.endpoint_auto_scaling",
+      "Next": "Finish - Notify Slack"
+    },
+    "Slack- Rollback Notification": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-rollback-endpoint-arn}",
+      "InputPath": "$.inputs.slack_message_rollback_notification",
+      "ResultPath": "$.results.slack_message_rollback_notification",
+      "Next": "Rollback Sagemaker Endpoint"
+    },
+    "Rollback Sagemaker Endpoint": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-slack-lambda-arn}",
+      "InputPath": "$.inputs.endpoint",
+      "ResultPath": "$.results.rollback_endpoint_status",
+      "Next": "Wait for Endpoint to be created/updated"
+    },
+    "Finish - Notify Slack": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-slack-lambda-arn}",
+      "InputPath": "$.inputs.slack_message_finish",
+      "End": true
+    },
+    "Fail - Notify Slack": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-slack-lambda-arn}",
+      "InputPath": "$.inputs.slack_message_fail",
+      "Next": "Failed training"
+    },
+    "Failed training" : {
+      "Type": "Fail"
+    }
+  }
+}

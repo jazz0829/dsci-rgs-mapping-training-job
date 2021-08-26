@@ -1,0 +1,62 @@
+{
+  "inputs": {
+    "slack_message_start_training": {
+      "message": "Started RGS classification model deployment "
+    },
+    "slack_message_rollback_notification": {
+      "message": "Updating RGS Mapping endpoint has failed. Rollback to the latest known working version"
+    },
+    "slack_message_finish": {
+      "message": "Done deploying RGS classification model"
+    },
+    "slack_message_fail": {
+      "message": "RGS classification model deployment has failed, no new model deployed"
+    },
+    "endpoint_configuration": {
+      "EndpointConfigName": "rgs-mapping-model",
+      "ProductionVariants": [
+        {
+          "VariantName": "variant-name-1",
+          "ModelName": "",
+          "InitialInstanceCount": ${initial_instance_count},
+          "InstanceType": "${prediction_instance_type}"
+        }
+      ],
+      "Tags": [
+        {
+          "Key": "Project",
+          "Value": "RGS Mapping"
+        },
+        {
+          "Key": "Terraform",
+          "Value": "True"
+        },
+        {
+          "Key": "GitHub-Repo",
+          "Value": "exactsoftware/dsci-rgs-mapping-training-job"
+        }
+      ]
+    },
+    "endpoint": {
+      "EndpointName": "${endpoint_name}"
+    },
+    "invoke_endpoint": {
+      "EndpointName": "${endpoint_name}",
+      "RequestBody": "[{\"TypeName\":\"General\",\"BalanceType\":\"B\",\"CredorDeb\":\"C\",\"Combined_Description\":\"Capital contributions EDT B.V. Equity Equity\",\"ReferenceId\":\"1\"}]"
+    },
+    "model_params": {
+      "Image": "${prediction_image}",
+      "ExecutionRoleArn": "${sagemaker_prediction_role_arn}",
+      "ModelName": "rgsmapping-50k-200-word",
+      "ModelDataUrl": "${model_data_url}"
+    },
+    "endpoint_auto_scaling":{
+      "EndpointName": "${endpoint_name}",
+      "VariantName" : "variant-name-1",
+      "MinCapacity": "${autoscaling_min_value}",
+      "MaxCapacity": "${autoscaling_max_value}",
+      "RoleARN" : "${autoscaling_role_arn}",
+      "IsEnabled": ${is_autoscaling_enabled}
+    }
+  }
+}
